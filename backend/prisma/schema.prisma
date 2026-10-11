@@ -1,0 +1,127 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         String    // state_commander, district_officer, field_responder, relief_coordinator, data_analyst, citizen
+  district     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  auditLogs    AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model District {
+  id              String     @id @default(cuid())
+  name            String     @unique
+  nametamil        String
+  population      Int
+  area            Float      // sq km
+  latitude        Float
+  longitude       Float
+  riskLevel       String     @default("LOW") // LOW, MODERATE, HIGH, CRITICAL
+  riskScore       Float      @default(0)
+  lastUpdated     DateTime   @default(now())
+  incidents       Incident[]
+  shelters        Shelter[]
+  resources       Resource[]
+}
+
+model Incident {
+  id           String    @id @default(cuid())
+  districtId   String
+  type         String    // FLOOD, CYCLONE, DROUGHT, HEATWAVE, LANDSLIDE
+  severity     String    // LOW, MODERATE, HIGH, CRITICAL
+  status       String    @default("ACTIVE") // ACTIVE, MONITORING, RESOLVED, CLOSED
+  title        String
+  description  String
+  affectedPop  Int       @default(0)
+  latitude     Float?
+  longitude    Float?
+  reportedAt   DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  resolvedAt   DateTime?
+  district     District  @relation(fields: [districtId], references: [id])
+  auditLogs    AuditLog[]
+}
+
+model Shelter {
+  id           String   @id @default(cuid())
+  districtId   String
+  name         String
+  nameTamil    String
+  latitude     Float
+  longitude    Float
+  capacity     Int
+  occupancy    Int      @default(0)
+  status       String   @default("OPERATIONAL") // OPERATIONAL, FULL, CLOSED, STANDBY
+  type         String   @default("PRIMARY") // PRIMARY, SECONDARY, TEMPORARY
+  waterSupply  Boolean  @default(true)
+  powerSupply  Boolean  @default(true)
+  medicalUnit  Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+  district     District @relation(fields: [districtId], references: [id])
+}
+
+model Resource {
+  id           String   @id @default(cuid())
+  districtId   String
+  type         String   // FOOD_PACKET, WATER_BOTTLE, MEDICINE_KIT, RESCUE_BOAT, GENERATOR, TENT
+  name         String
+  quantity     Int
+  unit         String
+  status       String   @default("AVAILABLE") // AVAILABLE, DEPLOYED, DEPLETED, MAINTENANCE
+  location     String
+  updatedAt    DateTime @updatedAt
+  district     District @relation(fields: [districtId], references: [id])
+}
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  userId     String?
+  incidentId String?
+  action     String
+  entity     String
+  entityId   String
+  before     String?   // JSON string
+  after      String?   // JSON string
+  timestamp  DateTime  @default(now())
+  user       User?     @relation(fields: [userId], references: [id])
+  incident   Incident? @relation(fields: [incidentId], references: [id])
+}
+
+model FloodRiskRecord {
+  id              String   @id @default(cuid())
+  districtId      String
+  calculatedAt    DateTime @default(now())
+  rainfallMm      Float
+  riverLevel      Float
+  soilSaturation  Float
+  historicalScore Float
+  riskScore       Float
+  riskLevel       String
+  assumptions     String   // JSON - transparent model assumptions
+  uncertainty     Float    // ± percentage
+  isSynthetic     Boolean  @default(true)
+}
